@@ -16,11 +16,11 @@ package config
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
+	"crypto/aes"
+	"crypto/cipher"
 	_ "embed"
-	"encoding/pem"
+	"encoding/base64"
+	"errors"
 	"os"
 	"strings"
 	"text/template"
@@ -67,16 +67,53 @@ func RenderContent(in []byte) (out []byte, err error) {
 	return
 }
 
-//go:embed private-key.pem
-var privateKey string
+var key = ""
 
-func DecryptRSA(src []byte) ([]byte, error) {
-	block, _ := pem.Decode([]byte(privateKey))
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+//pkcs7RemovePadding 填充的反向操作
+func pkcs7RemovePadding(data []byte) ([]byte, error) {
+	length := len(data)
+	if length == 0 {
+		return nil, errors.New("invalid data")
+	}
+	//获取填充的个数
+	unPadding := int(data[length-1])
+	return data[:(length - unPadding)], nil
+}
+
+//AesDecrypt 解密
+func AesDecrypt(data []byte, key []byte) ([]byte, error) {
+	//创建实例
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	return rsa.DecryptPKCS1v15(rand.Reader, key, src)
+	//获取块的大小
+	blockSize := block.BlockSize()
+	//使用cbc
+	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize])
+	//初始化解密数据接收切片
+	decrypted := make([]byte, len(data))
+	//执行解密
+	blockMode.CryptBlocks(decrypted, data)
+	//去除填充
+	decrypted, err = pkcs7RemovePadding(decrypted)
+	if err != nil {
+		return nil, err
+	}
+	return decrypted, nil
+}
+
+//DecryptByAes Aes 解密
+func DecryptByAes(data string) ([]byte, error) {
+	b, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+	result, err := AesDecrypt(b, []byte(key))
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func GetRenderedConfFromFile(path string) (out []byte, err error) {
@@ -85,7 +122,7 @@ func GetRenderedConfFromFile(path string) (out []byte, err error) {
 	if err != nil {
 		return
 	}
-	b, err = DecryptRSA(b)
+	b, err = DecryptByAes(string(b))
 	if err != nil {
 		return
 	}
