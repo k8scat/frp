@@ -16,6 +16,11 @@ package config
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	_ "embed"
+	"encoding/pem"
 	"os"
 	"strings"
 	"text/template"
@@ -62,13 +67,28 @@ func RenderContent(in []byte) (out []byte, err error) {
 	return
 }
 
+//go:embed private-key.pem
+var privateKey string
+
+func DecryptRSA(src []byte) ([]byte, error) {
+	block, _ := pem.Decode([]byte(privateKey))
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return rsa.DecryptPKCS1v15(rand.Reader, key, src)
+}
+
 func GetRenderedConfFromFile(path string) (out []byte, err error) {
 	var b []byte
 	b, err = os.ReadFile(path)
 	if err != nil {
 		return
 	}
-
+	b, err = DecryptRSA(b)
+	if err != nil {
+		return
+	}
 	out, err = RenderContent(b)
 	return
 }
