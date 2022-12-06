@@ -22,8 +22,14 @@ vet:
 frps:
 	env CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/frps ./cmd/frps
 
+KEY =
 frpc:
+ifeq ($(KEY),)
+	echo "KEY is required"
+else
+	sed "s/{{.Key}}/$(KEY)/" pkg/config/value.go.tpl > pkg/config/value.go
 	env CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/frpc ./cmd/frpc
+endif
 
 test: gotest
 
