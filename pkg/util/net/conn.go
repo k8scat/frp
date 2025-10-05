@@ -197,11 +197,11 @@ func (statsConn *StatsConn) Close() (err error) {
 }
 
 type wrapQuicStream struct {
-	quic.Stream
-	c quic.Connection
+	*quic.Stream
+	c *quic.Conn
 }
 
-func QuicStreamToNetConn(s quic.Stream, c quic.Connection) net.Conn {
+func QuicStreamToNetConn(s *quic.Stream, c *quic.Conn) net.Conn {
 	return &wrapQuicStream{
 		Stream: s,
 		c:      c,
@@ -223,7 +223,7 @@ func (conn *wrapQuicStream) RemoteAddr() net.Addr {
 }
 
 func (conn *wrapQuicStream) Close() error {
-	conn.Stream.CancelRead(0)
+	conn.CancelRead(0)
 	return conn.Stream.Close()
 }
 

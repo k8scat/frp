@@ -23,6 +23,7 @@ import (
 	"github.com/samber/lo"
 
 	v1 "github.com/fatedier/frp/pkg/config/v1"
+	"github.com/fatedier/frp/pkg/featuregate"
 )
 
 func ValidateClientCommonConfig(c *v1.ClientCommonConfig) (Warning, error) {
@@ -30,11 +31,30 @@ func ValidateClientCommonConfig(c *v1.ClientCommonConfig) (Warning, error) {
 		warnings Warning
 		errs     error
 	)
+	// validate feature gates
+	if c.VirtualNet.Address != "" {
+		if !featuregate.Enabled(featuregate.VirtualNet) {
+			return warnings, fmt.Errorf("VirtualNet feature is not enabled; enable it by setting the appropriate feature gate flag")
+		}
+	}
+
 	if !slices.Contains(SupportedAuthMethods, c.Auth.Method) {
 		errs = AppendError(errs, fmt.Errorf("invalid auth method, optional values are %v", SupportedAuthMethods))
 	}
 	if !lo.Every(SupportedAuthAdditionalScopes, c.Auth.AdditionalScopes) {
 		errs = AppendError(errs, fmt.Errorf("invalid auth additional scopes, optional values are %v", SupportedAuthAdditionalScopes))
+	}
+
+	// Validate token/tokenSource mutual exclusivity
+	if c.Auth.Token != "" && c.Auth.TokenSource != nil {
+		errs = AppendError(errs, fmt.Errorf("cannot specify both auth.token and auth.tokenSource"))
+	}
+
+	// Validate tokenSource if specified
+	if c.Auth.TokenSource != nil {
+		if err := c.Auth.TokenSource.Validate(); err != nil {
+			errs = AppendError(errs, fmt.Errorf("invalid auth.tokenSource: %v", err))
+		}
 	}
 
 	if err := validateLogConfig(&c.Log); err != nil {

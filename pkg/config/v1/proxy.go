@@ -129,7 +129,7 @@ func (c *ProxyBaseConfig) Complete(namePrefix string) {
 	c.Transport.BandwidthLimitMode = util.EmptyOr(c.Transport.BandwidthLimitMode, types.BandwidthLimitModeClient)
 
 	if c.Plugin.ClientPluginOptions != nil {
-		c.Plugin.ClientPluginOptions.Complete()
+		c.Plugin.Complete()
 	}
 }
 
@@ -422,6 +422,9 @@ type XTCPProxyConfig struct {
 
 	Secretkey  string   `json:"secretKey,omitempty"`
 	AllowUsers []string `json:"allowUsers,omitempty"`
+
+	// NatTraversal configuration for NAT traversal
+	NatTraversal *NatTraversalConfig `json:"natTraversal,omitempty"`
 }
 
 func (c *XTCPProxyConfig) MarshalToMsg(m *msg.NewProxy) {
